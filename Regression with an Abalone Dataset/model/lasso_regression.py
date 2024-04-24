@@ -53,19 +53,18 @@ def show_corr(df: pd.DataFrame):
 
 
 def show_pairplot(df: pd.DataFrame):
-    corr = df[df.columns].corr()
-    # corr = corr['Rings'][:].sort_values(ascending=True).to_frame()
+    numeric_cols = df.select_dtypes(exclude='object').columns
+    corr = df[numeric_cols].corr()
     top_corr = corr['Rings'].sort_values(ascending=False).head(10).index
     top_corr = top_corr.union(['Rings'])
     
     sns.pairplot(df[top_corr])
-    plt.savefig('output/image/pairplot_clean2.png')
+    plt.savefig('output/image/pairplot_clean3.png')
 
 
-def boxplot(df: pd.DataFrame):
+def boxplot(df: pd.DataFrame, show: bool = ...):
     global palette
-    NUM_COLS_F = [col for col in df.columns if df[col].dtype == 'float']
-
+    float_cols = df.select_dtypes(include='float').columns
     # Define the number of rows and columns for subplots
     num_rows = 4  # 4 rows
     num_cols = 4  # 4 columns
@@ -77,33 +76,31 @@ def boxplot(df: pd.DataFrame):
     axes = axes.flatten()
 
     # Loop through each numerical column and create a box plot
-    for i, col in enumerate(NUM_COLS_F[:num_rows * num_cols]):
+    for i, col in enumerate(float_cols[:num_rows * num_cols]):
         sns.boxplot(x=df[col], ax=axes[i], color=palette[i % len(palette)])
         axes[i].set_title(col)
 
     # Hide empty subplots
-    for i in range(len(NUM_COLS_F), num_rows * num_cols):
+    for i in range(len(float_cols), num_rows * num_cols):
         fig.delaxes(axes[i])
 
     plt.tight_layout()
-    plt.savefig('output/image/boxplot.png')
+    if show:
+        plt.show()
+    else:
+        plt.savefig('output/image/boxplot.png')
 
 
 def preprocessing(df: pd.DataFrame):
-    boxplot(df)
+    boxplot(df, False)
     df1 = df.copy()
-    df1 = df1.drop(df1[(df1['Rings'] > 27.5)].index)
-    df1 = df1.drop(df1[(df1['Rings'] < 2)].index)
-    df1 = df1.drop(df1[(df1['Diameter'] < 0.3) & (df1['Rings'] > 25)].index)
-    df1 = df1.drop(df1[(df1['Diameter'] > 0.3) & (df1['Rings'] < 2.5)].index)
-    df1 = df1.drop(df1[(df1['Height'] > 0.275)].index)
-    df1 = df1.drop(df1[(df1['Length'] < 0.5) & (df1['Rings'] > 25)].index)
-    df1 = df1.drop(df1[(df1['Shell weight'] > 1)].index)
-    df1 = df1.drop(df1[(df1['Shell weight'] > 0.2) & (df1['Rings'] < 2.5)].index)
-    df1 = df1.drop(df1[(df1['Whole weight.1'] > 1.4)].index)
-    df1 = df1.drop(df1[(df1['Whole weight.2'] > 0.6)].index)
+    df1 = df1.drop(df1[(df1['Height'] > 0.3)].index)
+    df1 = df1.drop(df1[(df1['Whole weight'] > 2.5)].index)
+    df1 = df1.drop(df1[(df1['Rings'] > 20)].index)
+    df1 = df1.drop(df1[(df1['Rings'] < 2.5)].index)
+    df1 = df1.drop(df1[(df1['Shell weight'] > 0.8)].index)
     print('Outliers removed =' , df.shape[0] - df1.shape[0])
-
+    show_pairplot(df1)
     return df1
 
 
@@ -241,7 +238,7 @@ def lasso_select_feature_importance(lasso_tuned, test):
 def lasso(X, y):
     scaler = Normalizer(norm='l2')
     X = scaler.fit_transform(X)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
     
     alpha = np.geomspace(1e-8, 1e-5, num=1000)
     lasso_cv_model = LassoCV(alphas = alpha, cv = 10, max_iter = 100000).fit(X_train, y_train)
@@ -262,39 +259,39 @@ def model_train():
     test['train'] = 0
     
     train_id, test_id = train['id'], test['id']
+    train = Feature_Engineering(train).copy()
+    train = preprocessing(train)
+    test = Feature_Engineering(test).copy()
     df = pd.concat([test, train])
-    df = Feature_Engineering(df).copy()
-    df = preprocessing(df[df['train'] == 1])
 
     y = df['Rings'].to_frame().dropna(axis=0)
     df =  df.drop('Rings', axis=1)
     
     # df_enc = encoding_categories(df)
     # show_histplot(df_enc)
-    # train_id, X, y = preprocessing(train)
     
     # Combining train and test for data cleaning
-    # df, _ = skewed_feature(df)
-    # df = encoding_categories(df)
-    # _X = df[df['train'] == 1]
-    # _test = df[df['train'] == 0]
+    df, _ = skewed_feature(df)
+    df = encoding_categories(df)
+    _X = df[df['train'] == 1]
+    _test = df[df['train'] == 0]
 
-    # X = _X.copy()
-    # test = _test.copy()
-    # X.drop(['train'], axis=1, inplace=True)
-    # test.drop(['train'], axis=1, inplace=True)
+    X = _X.copy()
+    test = _test.copy()
+    X.drop(['train'], axis=1, inplace=True)
+    test.drop(['train'], axis=1, inplace=True)
 
 
-    # y['Rings'] = np.log1p(y['Rings'])
-    # y = y['Rings']
+    y['Rings'] = np.log1p(y['Rings'])
+    y = y['Rings']
     
-    # model = lasso(X, y)
-    # lasso_select_feature_importance(model, test)
-    # y_hat = model.predict(test)
-    # res = pd.DataFrame(
-    #     {'id': test_id, 'Rings': y_hat}
-    # )
-    # res.to_csv('dataset/submit.csv', index=None)
+    model = lasso(X, y)
+    lasso_select_feature_importance(model, test)
+    y_hat = model.predict(test)
+    res = pd.DataFrame(
+        {'id': test_id, 'Rings': y_hat}
+    )
+    res.to_csv('dataset/submit.csv', index=None)
     # X['Rings'] = y
     # show_corr(X)
 
