@@ -33,31 +33,6 @@ def plots_design(fig, ax):
     ax.tick_params(axis='y', colors='white')
 
 
-def mini_batch_gradient_descent(X, y, theta, learning_rate=0.01, batch_size=32, epochs=100):
-    m = len(y)
-    n_batches = m // batch_size
-
-    for epoch in range(epochs):
-        # Shuffle the dataset
-        indices = np.random.permutation(m)
-        X_shuffled = X[indices]
-        y_shuffled = y[indices]
-
-        for i in range(0, m, n_batches):
-            X_batch = X_shuffled[i:i+batch_size]
-            y_batch = y_shuffled[i:i+batch_size]
-
-            # Compute gradient
-            error = X_batch.dot(theta) - y_batch
-            gradient = X_batch.T.dot(error) / batch_size
-
-            # Update parameters
-            theta -= learning_rate * gradient
-            # print(gradient.shape[0], gradient.shape[1])
-
-    return theta
-
-
 def show_corr(df: pd.DataFrame):
     corr = df[df.columns].corr()
     corr = corr['Rings'][:].sort_values(ascending=True).to_frame()
@@ -115,9 +90,6 @@ def boxplot(df: pd.DataFrame):
 
 
 def preprocessing(df: pd.DataFrame):
-    id = df['id']
-    del df['id']
-
     boxplot(df)
     df1 = df.copy()
     df1 = df1.drop(df1[(df1['Rings'] > 27.5)].index)
@@ -132,14 +104,7 @@ def preprocessing(df: pd.DataFrame):
     df1 = df1.drop(df1[(df1['Whole weight.2'] > 0.6)].index)
     print('Outliers removed =' , df.shape[0] - df1.shape[0])
 
-    X = df1.drop('Rings', axis=1)
-    y = df1['Rings'].to_frame()
-
-    return id, X, y
-
-
-def predict(X, theta):
-    pass
+    return df1
 
 
 def skewed_feature(df: pd.DataFrame):
@@ -199,6 +164,24 @@ def skew_visualize(y):
     plt.savefig('output/image/skew_y_log.png')
 
 
+def show_histplot(df: pd.DataFrame):
+    figsize = (12, 8)
+
+    fig, axs = plt.subplots(nrows=4, ncols=5, figsize=figsize)
+
+    axs = axs.flatten()
+
+    for i, col in enumerate(df.columns):
+        sns.histplot(df, x=col, ax=axs[i], hue='train')
+        axs[i].set_title(f'Histogram of {col}')
+    
+    for i in range(len(df.columns), len(axs)):
+        fig.delaxes(axs[i])
+
+    plt.tight_layout()
+    plt.show()
+
+
 def encoding_categories(df: pd.DataFrame):
     categ_cols = df.dtypes[df.dtypes == object]        # filtering by categorical variables
     categ_cols = categ_cols.index.tolist()                # list of categorical fields
@@ -213,17 +196,19 @@ def rmsle_score(y_true, y_pred):
     return np.sqrt(msle)
 
 
-def Feature_Engineering(df):
+def Feature_Engineering(df: pd.DataFrame):
 
+    del df['id']
     df["Height"] = df["Height"].clip(upper=0.5,lower=0.01)
     df["Volume"] = df["Length"]*df["Diameter"]*df["Height"]
     df["Density"] = df["Whole weight"]/df["Volume"]
-    df['Diameter_Length_ratio'] = df['Diameter'] / df['Length']
+    # df['Diameter_Length_ratio'] = df['Diameter'] / df['Length']
     df['Height_Length_ratio'] = df['Height'] / df['Length']
     df['Shell_Whole_weight_ratio'] = df['Shell weight'] / df['Whole weight']
     df['Mean_weights'] = (df['Whole weight']+df['Whole weight.1']+df['Whole weight.2'])/3 
+    df = df.reset_index(drop=True)
     
-    # Return Data 
+    # Return Data
     return df
 
 
@@ -264,7 +249,7 @@ def lasso(X, y):
     print('The Lasso II:')
     print("Alpha =", lasso_cv_model.alpha_)
     print("RMSLE =", rmsle_score(y_test, lasso_tuned.predict(X_test)))
-    print("score: ", lasso_tuned.score(X_train, y_train))
+    print("score: ", lasso_tuned.score(X_test, y_test))
 
     return lasso_tuned
 
@@ -272,37 +257,37 @@ def lasso(X, y):
 def model_train():
     train = pd.read_csv('dataset/train.csv')
     test = pd.read_csv('dataset/test.csv')
-    
-    train = Feature_Engineering(train)
-    test = Feature_Engineering(test)
-    train_id, X, y = preprocessing(train)
-    train = pd.concat([X, y])
 
-    test_id = test['id']
-    del test['id']
-    
-    X['train'] = 1
+    train['train'] = 1
     test['train'] = 0
-    # Combining train and test for data cleaning 
-    df = pd.concat([test, X])
-    df, _ = skewed_feature(df)
-
-    df_enc = encoding_categories(df)
-    _X = df_enc[df_enc['train']==1]
-    _test = df_enc[df_enc['train']==0]
-
-    X = _X.copy()
-    test = _test.copy()
-    X.drop(['train'], axis=1, inplace=True)
-    test.drop(['train'], axis=1, inplace=True)
-
-
-    # skew_visualize(y)
-    y['Rings'] = np.log1p(y['Rings'])
-    # skew_visualize(y)
-    y = y['Rings']
     
-    # x_cols = ['Shell weight', 'Length', 'Height', 'Whole weight', 'Whole weight.2', 'Whole weight.1', 'Diameter', 'Sex_I']
+    train_id, test_id = train['id'], test['id']
+    df = pd.concat([test, train])
+    df = Feature_Engineering(df).copy()
+    df = preprocessing(df[df['train'] == 1])
+
+    y = df['Rings'].to_frame().dropna(axis=0)
+    df =  df.drop('Rings', axis=1)
+    
+    # df_enc = encoding_categories(df)
+    # show_histplot(df_enc)
+    # train_id, X, y = preprocessing(train)
+    
+    # Combining train and test for data cleaning
+    # df, _ = skewed_feature(df)
+    # df = encoding_categories(df)
+    # _X = df[df['train'] == 1]
+    # _test = df[df['train'] == 0]
+
+    # X = _X.copy()
+    # test = _test.copy()
+    # X.drop(['train'], axis=1, inplace=True)
+    # test.drop(['train'], axis=1, inplace=True)
+
+
+    # y['Rings'] = np.log1p(y['Rings'])
+    # y = y['Rings']
+    
     # model = lasso(X, y)
     # lasso_select_feature_importance(model, test)
     # y_hat = model.predict(test)
