@@ -48,7 +48,7 @@ def show_corr(df: pd.DataFrame):
     plt.text(0.452, 39, "Other Features", size=24, color="grey", fontweight="bold")
 
     # Author
-    plt.text(0.9, -7, "@miguelfzzz", fontsize=11, ha="right", color='grey')
+    plt.text(0.9, -7, "@Mark-Walen", fontsize=11, ha="right", color='grey')
     plt.savefig('output/image/corr2.png')
 
 
@@ -62,7 +62,7 @@ def show_pairplot(df: pd.DataFrame):
     plt.savefig('output/image/pairplot_clean3.png')
 
 
-def boxplot(df: pd.DataFrame, show: bool = ...):
+def show_boxplot(df: pd.DataFrame, show: bool = ...):
     global palette
     float_cols = df.select_dtypes(include='float').columns
     # Define the number of rows and columns for subplots
@@ -91,37 +91,6 @@ def boxplot(df: pd.DataFrame, show: bool = ...):
         plt.savefig('output/image/boxplot.png')
 
 
-def preprocessing(df: pd.DataFrame):
-    boxplot(df, False)
-    df1 = df.copy()
-    df1 = df1.drop(df1[(df1['Height'] > 0.3)].index)
-    df1 = df1.drop(df1[(df1['Whole weight'] > 2.5)].index)
-    df1 = df1.drop(df1[(df1['Rings'] > 20)].index)
-    df1 = df1.drop(df1[(df1['Rings'] < 2.5)].index)
-    df1 = df1.drop(df1[(df1['Shell weight'] > 0.8)].index)
-    print('Outliers removed =' , df.shape[0] - df1.shape[0])
-    show_pairplot(df1)
-    return df1
-
-
-def skewed_feature(df: pd.DataFrame):
-    numeric_cols = df.select_dtypes(exclude='object').columns
-
-    skew_limit = 0.5
-    skew_vals = df[numeric_cols].skew()
-
-    skew_cols = (skew_vals
-                .sort_values(ascending=False)
-                .to_frame()
-                .rename(columns={0:'Skew'})
-                .query('abs(Skew) > {0}'.format(skew_limit)))
-
-    for col in skew_cols.index:
-        df[col] = boxcox1p(df[col], boxcox_normmax(df[col] + 1))
-    
-    return df, skew_cols
-
-
 def skew_visualize(y):
     import matplotlib.ticker as ticker
 
@@ -129,7 +98,7 @@ def skew_visualize(y):
     mpl.rcParams['font.size'] = 10
 
     # Visualization
-    fig, ax = plt.subplots(figsize =(9, 6))
+    fig, ax = plt.subplots(figsize=(9, 6))
     fig.patch.set_facecolor('black')
     ax.patch.set_facecolor('black')
 
@@ -179,36 +148,6 @@ def show_histplot(df: pd.DataFrame):
     plt.show()
 
 
-def encoding_categories(df: pd.DataFrame):
-    categ_cols = df.dtypes[df.dtypes == object]        # filtering by categorical variables
-    categ_cols = categ_cols.index.tolist()                # list of categorical fields
-
-    df_enc = pd.get_dummies(df, columns=categ_cols)   # One hot encoding
-
-    return df_enc
-
-
-def rmsle_score(y_true, y_pred):
-    msle = mean_squared_log_error(abs(y_true), abs(y_pred))
-    return np.sqrt(msle)
-
-
-def Feature_Engineering(df: pd.DataFrame):
-
-    del df['id']
-    df["Height"] = df["Height"].clip(upper=0.5,lower=0.01)
-    df["Volume"] = df["Length"]*df["Diameter"]*df["Height"]
-    df["Density"] = df["Whole weight"]/df["Volume"]
-    # df['Diameter_Length_ratio'] = df['Diameter'] / df['Length']
-    df['Height_Length_ratio'] = df['Height'] / df['Length']
-    df['Shell_Whole_weight_ratio'] = df['Shell weight'] / df['Whole weight']
-    df['Mean_weights'] = (df['Whole weight']+df['Whole weight.1']+df['Whole weight.2'])/3 
-    df = df.reset_index(drop=True)
-    
-    # Return Data
-    return df
-
-
 def lasso_select_feature_importance(lasso_tuned, test):
     # Selecting features importance
     coefs = pd.Series(lasso_tuned.coef_, index = test.columns)
@@ -235,12 +174,76 @@ def lasso_select_feature_importance(lasso_tuned, test):
     plt.show()
 
 
+def Feature_Engineering(df: pd.DataFrame):
+
+    del df['id']
+    df["Height"] = df["Height"].clip(upper=0.5,lower=0.01)
+    df["Height_log"] = np.log(df["Height"])
+    df["Volume"] = df["Length"]*df["Diameter"]*df["Height"]
+    df["Density"] = df["Whole weight"]/df["Volume"]
+    df['Height_Length_ratio'] = df['Height'] / df['Length']
+    df['Shell_Whole_weight_ratio'] = df['Shell weight'] / df['Whole weight']
+    df['Mean_weights'] = (df['Whole weight']+df['Whole weight.1']+df['Whole weight.2'])/2 
+    df = df.reset_index(drop=True)
+    
+    # Return Data
+    return df
+
+
+def preprocessing(df: pd.DataFrame):
+    # show_boxplot(df, False)
+    df1 = df.copy()
+    df1 = df1.drop(df1[(df1['Height'] > 0.275)].index)
+    df1 = df1.drop(df1[(df1['Whole weight'] > 2.5)].index)
+    df1 = df1.drop(df1[(df1['Rings'] > 25)].index)
+    df1 = df1.drop(df1[(df1['Rings'] < 2.5)].index)
+    df1 = df1.drop(df1[(df1['Shell weight'] > 0.8)].index)
+    # df1 = df1.drop(df1[(df1['Shell_Whole_weight_ratio'] > 2)].index)
+    print('Outliers removed =' , df.shape[0] - df1.shape[0])
+    # show_pairplot(df1)
+    return df1
+
+
+def skewed_feature(df: pd.DataFrame):
+    numeric_cols = df.select_dtypes(exclude='object').columns
+
+    skew_limit = 0.5
+    skew_vals = df[numeric_cols].skew()
+
+    skew_cols = (skew_vals
+                .sort_values(ascending=False)
+                .to_frame()
+                .rename(columns={0:'Skew'})
+                .query('abs(Skew) > {0}'.format(skew_limit)))
+
+    for col in skew_cols.index:
+        if col == 'Height_log':
+            continue
+        df[col] = boxcox1p(df[col], boxcox_normmax(df[col] + 1))
+    
+    return df, skew_cols
+
+
+def encoding_categories(df: pd.DataFrame):
+    categ_cols = df.dtypes[df.dtypes == object]        # filtering by categorical variables
+    categ_cols = categ_cols.index.tolist()                # list of categorical fields
+
+    df_enc = pd.get_dummies(df, columns=categ_cols)   # One hot encoding
+
+    return df_enc
+
+
+def rmsle_score(y_true, y_pred):
+    msle = mean_squared_log_error(abs(y_true), abs(y_pred))
+    return np.sqrt(msle)
+
+
 def lasso(X, y):
     scaler = Normalizer(norm='l2')
     X = scaler.fit_transform(X)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
     
-    alpha = np.geomspace(1e-8, 1e-5, num=1000)
+    alpha = np.geomspace(1e-9, 1e-5, num=100)
     lasso_cv_model = LassoCV(alphas = alpha, cv = 10, max_iter = 100000).fit(X_train, y_train)
     lasso_tuned = Lasso(max_iter = 100000).set_params(alpha=lasso_cv_model.alpha_).fit(X_train, y_train)
     print('The Lasso II:')
@@ -281,7 +284,8 @@ def model_train():
     X.drop(['train'], axis=1, inplace=True)
     test.drop(['train'], axis=1, inplace=True)
 
-
+    # X, _ = skewed_feature(X)
+    # test, _ = skewed_feature(test)
     y['Rings'] = np.log1p(y['Rings'])
     y = y['Rings']
     
@@ -292,8 +296,8 @@ def model_train():
         {'id': test_id, 'Rings': y_hat}
     )
     res.to_csv('dataset/submit.csv', index=None)
-    # X['Rings'] = y
-    # show_corr(X)
+    X['Rings'] = y
+    show_corr(X)
 
 
 def test(theta):
