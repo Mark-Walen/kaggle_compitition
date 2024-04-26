@@ -207,7 +207,7 @@ def preprocessing(df: pd.DataFrame):
 def skewed_feature(df: pd.DataFrame):
     numeric_cols = df.select_dtypes(exclude='object').columns
 
-    skew_limit = 0.5
+    skew_limit = 0.41
     skew_vals = df[numeric_cols].skew()
 
     skew_cols = (skew_vals
@@ -224,7 +224,16 @@ def skewed_feature(df: pd.DataFrame):
     return df, skew_cols
 
 
-def encoding_categories(df: pd.DataFrame):
+def serial_encoding_categories(df: pd.DataFrame):
+    categ_cols = df.dtypes[df.dtypes == object]        # filtering by categorical variables
+    categ_cols = categ_cols.index.tolist()                # list of categorical fields
+
+    df_enc = pd.get_dummies(df, columns=categ_cols)   # One hot encoding
+
+    return df_enc
+
+
+def onehot_encoding_categories(df: pd.DataFrame):
     categ_cols = df.dtypes[df.dtypes == object]        # filtering by categorical variables
     categ_cols = categ_cols.index.tolist()                # list of categorical fields
 
@@ -239,8 +248,6 @@ def rmsle_score(y_true, y_pred):
 
 
 def lasso(X, y):
-    scaler = Normalizer(norm='l2')
-    X = scaler.fit_transform(X)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
     
     alpha = np.geomspace(1e-9, 1e-5, num=100)
@@ -252,6 +259,22 @@ def lasso(X, y):
     print("score: ", lasso_tuned.score(X_test, y_test))
 
     return lasso_tuned
+
+
+def normalize(df: pd.DataFrame, scaler):
+    numerical_cols = df.select_dtypes(include=['float64', 'int64']).columns
+    object_cols = df.select_dtypes(include=['object']).columns
+    train_column = df['train']
+
+    if 'train' in numerical_cols:
+        numerical_cols = numerical_cols.drop('train')
+
+    df_normalized = df.copy()
+    df_normalized[numerical_cols] = scaler.fit_transform(df[numerical_cols])
+    df_normalized = pd.concat([df_normalized[numerical_cols], df[object_cols]], axis=1)
+    df_normalized['train'] = train_column
+
+    return df_normalized
 
 
 def model_train():
@@ -270,12 +293,11 @@ def model_train():
     y = df['Rings'].to_frame().dropna(axis=0)
     df =  df.drop('Rings', axis=1)
     
-    # df_enc = encoding_categories(df)
-    # show_histplot(df_enc)
-    
     # Combining train and test for data cleaning
     df, _ = skewed_feature(df)
-    df = encoding_categories(df)
+    scaler = Normalizer(norm='l2')
+    df = normalize(df, scaler)
+    df = onehot_encoding_categories(df).copy()
     _X = df[df['train'] == 1]
     _test = df[df['train'] == 0]
 
@@ -284,14 +306,15 @@ def model_train():
     X.drop(['train'], axis=1, inplace=True)
     test.drop(['train'], axis=1, inplace=True)
 
-    # X, _ = skewed_feature(X)
-    # test, _ = skewed_feature(test)
     y['Rings'] = np.log1p(y['Rings'])
     y = y['Rings']
     
-    model = lasso(X, y)
-    lasso_select_feature_importance(model, test)
-    y_hat = model.predict(test)
+    features = X.columns.drop(['Sex_M', 'Sex_F', 'Volume', 'Length'])
+    # feature = X.columns
+    model = lasso(X[features], y)
+    lasso_select_feature_importance(model, test[features])
+    y_hat = model.predict(test[features])
+    y_hat = np.expm1(y_hat)
     res = pd.DataFrame(
         {'id': test_id, 'Rings': y_hat}
     )
