@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import matplotlib as mpl
@@ -11,6 +12,8 @@ from sklearn.preprocessing import Normalizer
 from sklearn.linear_model import Lasso, LassoCV
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_log_error
+
+__cur_proj_dir = os.path.dirname(os.path.dirname(__file__))
 
 palette = ['#328ca9', '#0e6ea9', '#2c4ea3', '#193882', '#102446']
 
@@ -48,7 +51,7 @@ def show_corr(df: pd.DataFrame):
 
     # Author
     plt.text(0.9, -7, "@Mark-Walen", fontsize=11, ha="right", color='grey')
-    plt.savefig('output/image/corr2.png')
+    plt.savefig(f'{__cur_proj_dir}\\output\\image\\corr2.png')
 
 
 def show_pairplot(df: pd.DataFrame):
@@ -58,7 +61,7 @@ def show_pairplot(df: pd.DataFrame):
     top_corr = top_corr.union(['Rings'])
 
     sns.pairplot(df[top_corr])
-    plt.savefig('output/image/pairplot_clean3.png')
+    plt.savefig(f'{__cur_proj_dir}\\output\\image\\pairplot_clean3.png')
 
 
 def show_boxplot(df: pd.DataFrame, show: bool = ...):
@@ -87,7 +90,7 @@ def show_boxplot(df: pd.DataFrame, show: bool = ...):
     if show:
         plt.show()
     else:
-        plt.savefig('output/image/boxplot.png')
+        plt.savefig(f'{__cur_proj_dir}\\output\\image\\boxplot.png')
 
 
 def skew_visualize(y):
@@ -126,7 +129,7 @@ def skew_visualize(y):
 
     plt.text(7.5, 1.5, "Rings", size=22, color="#ff7f50", fontweight="bold")
     plt.text(11.75, 1.5, "Distribution", size=22, color="grey", fontweight="bold")
-    plt.savefig('output/image/skew_y_log.png')
+    plt.savefig(f'{__cur_proj_dir}\\output\\image\\skew_y_log.png')
 
 
 def show_histplot(df: pd.DataFrame):
@@ -276,8 +279,8 @@ def normalize(df: pd.DataFrame, scaler):
 
 
 def model_train():
-    train = pd.read_csv('dataset/train.csv')
-    test = pd.read_csv('dataset/test.csv')
+    train = pd.read_csv(f'{__cur_proj_dir}\\dataset\\train.csv')
+    test = pd.read_csv(f'{__cur_proj_dir}\\dataset\\test.csv')
 
     train['train'] = 1
     test['train'] = 0
@@ -316,13 +319,9 @@ def model_train():
     res = pd.DataFrame(
         {'id': test_id, 'Rings': y_hat}
     )
-    res.to_csv('dataset/submit.csv', index=None)
+    res.to_csv(f'{__cur_proj_dir}\\dataset\\submit.csv', index=None)
     X['Rings'] = y
     show_corr(X)
-
-
-def test(theta):
-    data_test = pd.read_csv('dataset/test.csv')
 
 
 def main():

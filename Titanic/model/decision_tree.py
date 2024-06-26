@@ -1,12 +1,15 @@
-import pandas as pd
-import numpy as np
-import joblib
+import os
 
+import joblib
+import numpy as np
+import pandas as pd
 from sklearn import tree
-from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error, accuracy_score
+from sklearn.model_selection import KFold
 
 model = tree.DecisionTreeClassifier()
+
+__cur_proj_dir = os.path.dirname(os.path.dirname(__file__))
 
 
 def prepare_data(df: pd.DataFrame):
@@ -28,11 +31,11 @@ def prepare_data(df: pd.DataFrame):
 
 
 def train():
-    df = pd.read_csv('dataset/train.csv')
+    df = pd.read_csv(f'{__cur_proj_dir}\\dataset\\train.csv')
     cols = ['Pclass', 'Sex', 'Age', 'SibSp', 'Parch', 'Embarked', 'Fare']
     x_cols = ['Sex', 'Pclass', 'Fare']
     y_cols = ['Survived']
-    
+
     df = prepare_data(df)
     _df = df[cols]
 
@@ -46,7 +49,7 @@ def train():
     for train_idx, test_idx in kf.split(X):
         x_train, x_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
-        
+
         _m = model.fit(x_train, y_train)
         score = model.score(x_test, y_test)
         y_pred = model.predict(x_test)
@@ -58,11 +61,11 @@ def train():
             _score = score
             _model = _m
 
-    joblib.dump(_model, 'output/decision_tree.pkl')
+    joblib.dump(_model, f'{__cur_proj_dir}\\output\\decision_tree.pkl')
 
 
 def predict(X, y):
-    _model = joblib.load('output/decision_tree.pkl')
+    _model = joblib.load(f'{__cur_proj_dir}\\output\\decision_tree.pkl')
     y_pred = _model.predict(X)
 
     print('score: ', accuracy_score(y, y_pred))
@@ -70,8 +73,8 @@ def predict(X, y):
 
 
 def test():
-    data_test = pd.read_csv('dataset/test.csv')
-    y_test = pd.read_csv('dataset/gender_submission.csv')['Survived']
+    data_test = pd.read_csv(f'{__cur_proj_dir}\\dataset\\test.csv')
+    y_test = pd.read_csv(f'{__cur_proj_dir}\\dataset\\gender_submission.csv')['Survived']
     data_test = prepare_data(data_test)
     x_cols = ['Sex', 'Pclass', 'Fare']
     _df = data_test[x_cols]
@@ -84,10 +87,11 @@ def test():
     y_hat = y_hat.ravel()
     res = pd.DataFrame(
         {'PassengerId': data_test['PassengerId'], 'Survived': y_hat.astype(np.int32)})
-    res.to_csv('dataset/submit.csv', index=None)
+    res.to_csv(f'{__cur_proj_dir}\\dataset\\submit.csv', index=None)
 
 
 def main():
+    train()
     test()
 
 
