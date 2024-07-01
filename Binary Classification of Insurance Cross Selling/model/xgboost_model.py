@@ -1,5 +1,6 @@
 import gc
 import os.path
+from contextlib import redirect_stdout
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -256,7 +257,17 @@ def read_data():
 
 
 def main():
-    read_data()
+    df_train, df_test = read_data()
+    with open('{}\\output\\train_info.txt'.format(proj_dir), 'w') as f:
+        with redirect_stdout(f):
+            print(df_train.info())
+    df_train.describe().to_csv('{}\\output\\train_describe.csv'.format(proj_dir))
+
+    print("*" * 20, " --Test data-- ", "*" * 20)
+    with open('{}\\output\\test_info.txt'.format(proj_dir), 'w') as f:
+        with redirect_stdout(f):
+            print(df_test.info())
+    df_test.describe().to_csv('{}\\output\\test_describe.csv'.format(proj_dir))
 
 
 if __name__ == '__main__':

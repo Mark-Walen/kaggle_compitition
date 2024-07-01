@@ -1,0 +1,18 @@
+<class 'pandas.core.frame.DataFrame'>
+RangeIndex: 7669866 entries, 0 to 7669865
+Data columns (total 11 columns):
+ #   Column                Dtype  
+---  ------                -----
+ 1   Gender                object 
+ 2   Age                   int64  
+ 3   Driving_License       int64  
+ 4   Region_Code           float64
+ 5   Previously_Insured    int64  
+ 6   Vehicle_Age           object 
+ 7   Vehicle_Damage        object 
+ 8   Annual_Premium        float64
+ 9   Policy_Sales_Channel  float64
+ 10  Vintage               int64  
+dtypes: float64(3), int64(5), object(3)
+memory usage: 643.7+ MB
+None
