@@ -2,7 +2,8 @@
 RangeIndex: 7669866 entries, 0 to 7669865
 Data columns (total 11 columns):
  #   Column                Dtype  
----  ------                -----
+---  ------                -----  
+ 0   id                    int64  
  1   Gender                object 
  2   Age                   int64  
  3   Driving_License       int64  
@@ -16,3 +17,4 @@ Data columns (total 11 columns):
 dtypes: float64(3), int64(5), object(3)
 memory usage: 643.7+ MB
 None
+Unique values in df_train:

@@ -1,17 +1,16 @@
 import gc
 import os.path
-from contextlib import redirect_stdout
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import xgboost as xgb
 from scipy.special import boxcox1p
 from scipy.stats import boxcox_normmax
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder, StandardScaler
+from xgboost import XGBClassifier
 
 proj_dir = os.path.dirname(os.path.dirname(__file__))
 
@@ -122,9 +121,9 @@ def show_feature_importance(corr: pd.DataFrame, y_label: str):
 
 
 def show_corr_heatmap(corr: pd.DataFrame):
-    fig, ax = plt.subplots(figsize=(22, 19))
+    fig, ax = plt.subplots(figsize=(11, 9))
     plt.subplots_adjust(left=0.2, bottom=0.2)
-    sns.heatmap(corr)
+    sns.heatmap(corr, cmap='coolwarm')
     plt.savefig(f'{proj_dir}\\output\\image\\corr.png')
 
 
@@ -214,20 +213,20 @@ def target_predictor(X, y, test, iterations, model, model_name):
 
         # PREDICTING ON VALIDATION DATA
         col_name = model_name + 'xpreds_' + str(k)
-        preds_x = pd.Series(model.predict(val_X))
-        df_preds_x[col_name] = pd.Series(model.predict(X))
+        preds_x = pd.Series(model.predict_proba(val_X)[:, 1])
+        df_preds_x[col_name] = pd.Series(model.predict_proba(X)[:, 1])
 
         # CALCULATING ACCURACY
-        acc = accuracy_score(val_y, preds_x)
+        acc = roc_auc_score(val_y, preds_x)
         print('Iteration:', k, '  accuracy_score:', acc)
         if k == 1:
             score = acc
             best_model = model
-            preds = pd.Series(model.predict(test))
+            preds = pd.Series(model.predict_proba(test)[:, 1])
             col_name = model_name + 'preds_' + str(k)
             df_preds[col_name] = preds
         else:
-            preds1 = pd.Series(model.predict(test))
+            preds1 = pd.Series(model.predict_proba(test)[:, 1])
             preds = preds + preds1
             col_name = model_name + 'preds_' + str(k)
             df_preds[col_name] = preds1
@@ -256,18 +255,81 @@ def read_data():
     return train, test
 
 
+def feature_encode(df: pd.DataFrame):
+    df['Gender'] = df['Gender'].map({'Female': 0, 'Male': 1})
+    df['Vehicle_Age'] = df['Vehicle_Age'].map({'< 1 Year': 0, '1-2 Year': 1, '> 2 Years': 2})
+    df['Vehicle_Damage'] = df['Vehicle_Damage'].map({'No': 0, 'Yes': 1})
+
+    return df
+
+
 def main():
     df_train, df_test = read_data()
-    with open('{}\\output\\train_info.txt'.format(proj_dir), 'w') as f:
-        with redirect_stdout(f):
-            print(df_train.info())
-    df_train.describe().to_csv('{}\\output\\train_describe.csv'.format(proj_dir))
+    df_train = feature_encode(df_train)
+    df_test = feature_encode(df_test)
 
-    print("*" * 20, " --Test data-- ", "*" * 20)
-    with open('{}\\output\\test_info.txt'.format(proj_dir), 'w') as f:
-        with redirect_stdout(f):
-            print(df_test.info())
-    df_test.describe().to_csv('{}\\output\\test_describe.csv'.format(proj_dir))
+    test_id = df_test['id']
+
+    df_dtype = pd.DataFrame()
+    df_dtype['cols'] = df_train.columns[1:-1]
+    df_dtype['data_type'] = list([df_train[col].dtype for col in df_train.columns[1:-1]])
+    df_dtype['unique_val'] = list([len(df_train[col].unique()) for col in df_train.columns[1:-1]])
+    df_dtype['val_type'] = list(['conti' if x == 'float32' else 'categ' for x in df_dtype['data_type']])
+
+    categ_cols_bin = df_dtype['cols'][(df_dtype.val_type == 'categ') & (df_dtype.unique_val <= 2)]
+    categ_cols_nonbin = df_dtype['cols'][(df_dtype.val_type == 'categ') & (df_dtype.unique_val > 2)]
+    conti_cols = df_dtype['cols'][df_dtype.val_type == 'conti']
+
+    scaler = StandardScaler()
+    X = pd.DataFrame(scaler.fit_transform(df_train[list(categ_cols_nonbin) + list(conti_cols)]),
+                     columns=list(categ_cols_nonbin) + list(conti_cols))
+    X = pd.concat([X, df_train[categ_cols_bin]], axis=1)
+    test = pd.DataFrame(scaler.transform(df_test[list(categ_cols_nonbin) + list(conti_cols)]),
+                        columns=list(categ_cols_nonbin) + list(conti_cols))
+    test = pd.concat([test, df_test[categ_cols_bin]], axis=1)
+    y = df_train['Response'].values.ravel()
+
+    # auto_model = Fedot(
+    #     problem="classification",
+    #     metric=["precision", "accuracy", "roc_auc"],
+    #     preset="best_quality",
+    #     with_tuning=True,
+    #     timeout=480,
+    #     cv_folds=10,
+    #     seed=42,
+    #     n_jobs=1,
+    #     logging_level=10,
+    #     use_pipelines_cache=False,
+    #     use_auto_preprocessing=False
+    # )
+    # auto_model.fit(features=X, target=y, predefined_model='xgboost')
+    # prediction = auto_model.predict_proba(features=test)
+    # print(auto_model.params)
+
+    params = {
+        'colsample_bylevel': 0.17890852063569318,
+        'colsample_bynode': 0.6876719819708317,
+        'colsample_bytree': 0.27719528944870964,
+        'eval_metric': "auc",
+        'gamma': 0.6089564449724606,
+        'max_bin': 723,
+        'max_delta_step': 2.038779044218088,
+        'max_depth': 88,
+        'min_child_weight': 8.066633741018023,
+        'n_estimators': 100,
+        'n_jobs': -1,
+        'objective': "binary:logistic",
+        'random_state': 200,
+        'reg_alpha': 0.948419450726814
+    }
+
+    model = XGBClassifier(**params)
+    xgb_predictions, best_xgb_model, XGBpreds = target_predictor(X, y, test, 10, model, 'XGB')
+    prediction = model.predict_proba(test)[:, 1]
+    res = pd.DataFrame(
+        {'id': test_id, 'Response': prediction.ravel()}
+    )
+    res.to_csv(f'{proj_dir}\\dataset\\submit_2.csv', index=None)
 
 
 if __name__ == '__main__':
