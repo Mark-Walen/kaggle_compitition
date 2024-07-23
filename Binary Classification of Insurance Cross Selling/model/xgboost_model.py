@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import joblib
+
 from scipy.special import boxcox1p
 from scipy.stats import boxcox_normmax
 from sklearn.metrics import roc_auc_score
@@ -307,16 +309,16 @@ def main():
     # print(auto_model.params)
 
     params = {
-        'colsample_bylevel': 0.17890852063569318,
-        'colsample_bynode': 0.6876719819708317,
+        # 'colsample_bylevel': 0.17890852063569318,
+        # 'colsample_bynode': 0.6876719819708317,
         'colsample_bytree': 0.27719528944870964,
         'eval_metric': "auc",
-        'gamma': 0.6089564449724606,
-        'max_bin': 723,
+        'gamma': 0.9089564449724606,
+        'max_bin': 10246,
         'max_delta_step': 2.038779044218088,
-        'max_depth': 88,
-        'min_child_weight': 8.066633741018023,
-        'n_estimators': 100,
+        'max_depth': 22,
+        'min_child_weight': 10.066633741018023,
+        'n_estimators': 1000,
         'n_jobs': -1,
         'objective': "binary:logistic",
         'random_state': 200,
@@ -329,7 +331,8 @@ def main():
     res = pd.DataFrame(
         {'id': test_id, 'Response': prediction.ravel()}
     )
-    res.to_csv(f'{proj_dir}\\dataset\\submit_2.csv', index=None)
+    joblib.dump(best_xgb_model, f'{proj_dir}\\output\\best_xgb_model.pkl')
+    res.to_parquet(f'{proj_dir}\\dataset\\submit_3.parquet', index=None)
 
 
 if __name__ == '__main__':
